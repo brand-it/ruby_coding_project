@@ -41,7 +41,7 @@ class FleetManager < Sinatra::Base
     puts "configuration: #{body}"
     enrolled = Enrollment.find(node_key: body['node_key'])
 
-    return File.read('config.json') if enrolled
+    return enrolled.query.to_json if enrolled
 
     {
       schedule: {},
@@ -117,5 +117,18 @@ Enrollment = Struct.new(:id, :host_identifier, :platform_type, :host_details, :n
   # Just to help out with testing
   def host_details_serialized
     JSON.parse(host_details)
+  end
+
+  def query
+    {
+      schedule: {
+        select_processes: {
+          interval: '5',
+          description: "select all running processes",
+          query: "SELECT * FROM processes;"
+        }
+      },
+      "node_invalid": false
+    }
   end
 end

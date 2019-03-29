@@ -79,7 +79,7 @@ describe FleetManager do
     context 'when enrolled' do
       subject(:configuration) { post '/configuration', { node_key: create.node_key }.to_json }
 
-      it { expect(json).to eq JSON.parse(File.read('config.json')) }
+      it { expect(json).to eq JSON.parse(create.query.to_json) }
     end
 
     context 'when not enrolled' do
