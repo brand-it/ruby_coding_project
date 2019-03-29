@@ -22,7 +22,7 @@ class FleetManager < Sinatra::Base
     puts "configuration: #{body}"
 
     node_invalid = true
-    if valid_enroll_key?(body['enroll_secret'])
+    if ENROLL_SECRET == body['enroll_secret']
       node_invalid = false
       node_key = Enrollment.create(
         platform_type: body['platform_type'],
@@ -53,28 +53,37 @@ class FleetManager < Sinatra::Base
 
   def parse_body_json
     JSON.parse(request.body.read)
-  end
-
-  def valid_enroll_key?(key)
-    ENROLL_SECRET == key
+  rescue StandardError => e
+    puts e.message
+    {} # return empty hash if the json from the client is invalid and we can't parse
   end
 end
 
 Enrollment = Struct.new(:id, :host_identifier, :platform_type, :host_details, :node_key) do
   TABLE_NAME = 'enrollment'
 
+  # Find Enrollment using an ID or node_key
   def self.find(id: nil, node_key: nil)
-    where = "id = #{id.to_i}" if id
-    where = "node_key = '#{node_key}'" if node_key
+    if id
+      column = 'id'
+      value = id
+    elsif node_key
+      column = 'node_key'
+      value = node_key
+    end
+    raise 'ID or node_key are required' if value.nil?
 
-    raise 'ID or node_key are required' if where.nil?
-
-    record = DB.execute("SELECT * FROM #{TABLE_NAME} WHERE #{where} LIMIT 1").first
+    record = DB.execute("SELECT * FROM #{TABLE_NAME} WHERE #{column} = ? LIMIT 1", value).first
     return if record.nil?
 
     Enrollment.new(*record)
   end
 
+  # Encoding ENROLL_SECRET and Time into a string makes
+  # it harder for the client to guess someone else enrollment.
+  # Makes it so they can't just increase or decrease the ID and
+  # find the next users enrollment. More can be added to make guessing
+  # the key harder, but for now, this is a scalable solution.
   def self.create_node_key
     Base64.urlsafe_encode64("#{ENROLL_SECRET}-#{Time.now.to_i}")
   end
@@ -87,16 +96,25 @@ Enrollment = Struct.new(:id, :host_identifier, :platform_type, :host_details, :n
     ).map { |v| Enrollment.new(*v) }
   end
 
+  # Create a new Enrollment in the database with a node_key attached
   def self.create(platform_type:, host_identifier:, host_details:)
     node_key = create_node_key
-    DB.execute <<-SQL
+    sql_query = <<-SQL
       INSERT INTO #{TABLE_NAME} (platform_type, host_identifier, host_details, node_key)
-      VALUES (#{platform_type.to_i}, '#{host_identifier}', '#{host_details.to_json}', '#{node_key}')
+      VALUES (?, ?, ?, ?)
     SQL
+    DB.execute(
+      sql_query,
+      platform_type.to_i,
+      host_identifier,
+      host_details.to_json,
+      node_key
+    )
     id = DB.execute('SELECT last_insert_rowid()').flatten.first
     Enrollment.new(id, host_identifier, platform_type.to_i, host_details.to_json, node_key)
   end
 
+  # Just to help out with testing
   def host_details_serialized
     JSON.parse(host_details)
   end

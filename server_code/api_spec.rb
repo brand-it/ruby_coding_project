@@ -96,6 +96,15 @@ describe FleetManager do
     it { expect(find.host_identifier).to eq create.host_identifier }
     it { expect(find.host_details).to eq create.host_details }
     it { expect(find.host_details_serialized).to eq create.host_details_serialized }
+
+    context 'when your being bad with your inputs figured' do
+      subject!(:find) do
+        create
+        Enrollment.find(node_key: '1 OR 1 = 1')
+      end
+
+      it { expect(find).to eq nil }
+    end
   end
 
   describe 'Enrollment.create' do
