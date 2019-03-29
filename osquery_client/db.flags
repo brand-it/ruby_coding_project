@@ -1,0 +1,16 @@
+--host_identifier=uuid
+--pidfile=db.pid
+--database_path=db.db
+--log_result_events=true
+--enroll_secret_path=db.secret
+--tls_hostname=localhost:9292
+--config_plugin=tls
+--config_tls_endpoint=/configuration
+--config_tls_refresh=30
+--enroll_tls_endpoint=/enroll
+--tls_server_certs=server.crt
+--disable_logging=true
+--force
+--utc
+--allow_unsafe
+--verbose
